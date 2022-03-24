@@ -5,25 +5,26 @@ class Document(list: MutableList<Any>) : MutableList<Any> by list {
 
     private val noDrawerForValue = { x: Any -> "No drawer for value." }
 
-    inline fun <reified T> registerDrawer(noinline fn: Drawer<T>) {
-        drawer[T::class.java] = fn
-    }
+    inline fun <reified T> registerDrawer(noinline fn: Drawer<T>) = drawer.put(T::class.java, fn)
 
-    fun draw(pos: Int) =
-        """<document>
- ${
-            joinToString("\n") { value ->
-                if (value is Document)
-                    drawDoc(value, pos + 2).lines().joinToString("\n") { " ".repeat(pos + 2) + it }
-                else draw(value, pos + 2).padStart(5)
+    fun draw(pos: Int): String {
+        fun content() = joinToString("\n") { value ->
+            when (value) {
+                is Document -> value.draw(pos)
+                else -> draw(value, pos + 2).padStart(5)
             }
         }
-</document>"""
 
-    private fun drawDoc(document: Document, pos: Int): String = document.draw(pos)
+        return """
+<document>
+${content()}
+</document>""".trimIndent().lines().joinToString("\n" + " ".repeat(pos + 2))
+    }
 
     private fun draw(value: Any, pos: Int) =
-        ((drawer[value!!::class.java] ?: noDrawerForValue) as Drawer<Any>)(value).padStart(pos)
+        (drawer.getOrDefault(value.javaClass, noDrawerForValue) as Drawer<Any>).let { drawIt ->
+            " ".repeat(pos) + drawIt(value)
+        }
 
     fun copy() = Document(toMutableList()).also { it.drawer.putAll(drawer) }
 }
@@ -43,5 +44,4 @@ fun main(args: Array<String>) {
     document.add(123)
 
     println(document.draw(0))
-
 }
